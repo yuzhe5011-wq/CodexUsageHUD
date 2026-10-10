@@ -7,7 +7,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$script:RefreshSeconds = 300
+$script:RefreshSeconds = 120
 $script:RpcTimeoutMs = 12000
 $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
 if ([string]::IsNullOrWhiteSpace($localAppData)) { $localAppData = $env:LOCALAPPDATA }
@@ -287,6 +287,22 @@ function Convert-AppServerResponse {
     }
 }
 
+function Test-UsageData {
+    param(
+        [Parameter(Mandatory = $true)]$Data
+    )
+
+    if ($null -eq $Data) { return $false }
+    $primary = $Data.Primary
+    $secondary = $Data.Secondary
+    return (
+        ($null -ne $primary -and ($null -ne $primary.Remaining -or $null -ne $primary.ResetAt)) -or
+        ($null -ne $secondary -and ($null -ne $secondary.Remaining -or $null -ne $secondary.ResetAt)) -or
+        $null -ne $Data.AvailableResetCredits -or
+        $null -ne $Data.NextCreditExpiry
+    )
+}
+
 function Get-DemoData {
     $response = [pscustomobject]@{
         rateLimits = [pscustomobject]@{
@@ -441,8 +457,12 @@ function Get-LiveData {
         Send-AppServerMessage -Process $process -Message @{ method = 'initialized'; params = @{} }
         Send-AppServerMessage -Process $process -Message @{ id = 2; method = 'account/rateLimits/read'; params = @{} }
         $response = Read-AppServerResponse -Process $process -Id 2
+        $data = Convert-AppServerResponse -Response $response
+        if (-not (Test-UsageData -Data $data)) {
+            throw 'Codex app-server 返回了空的用量数据。'
+        }
         Write-HudLog -Level INFO -Message 'Codex app-server returned account/rateLimits/read.'
-        return Convert-AppServerResponse -Response $response
+        return $data
     } finally {
         try { $process.StandardInput.Close() } catch { Write-HudException -Context 'Close Codex app-server stdin failed' -Exception $_.Exception }
         if (-not $process.HasExited) {
@@ -496,6 +516,10 @@ if ($SelfTest) {
         $weeklyOnly.Secondary.Remaining -ne 94 -or
         $futureCountdown -eq '即将刷新') {
         throw 'Self-test failed: missing-field semantics.'
+    }
+    $empty = Convert-AppServerResponse -Response ([pscustomobject]@{ rateLimits = [pscustomobject]@{} })
+    if (Test-UsageData -Data $empty) {
+        throw 'Self-test failed: empty usage payload was accepted.'
     }
     Write-Output 'PASS: response parsing and reset-credit expiry selection'
     exit 0
@@ -657,7 +681,10 @@ public static class HudNativeMethods {
 
             <StackPanel Grid.Column="10" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <TextBlock x:Name="RefreshGlyph" Text="↻" Foreground="#8EA5B6" FontSize="16" FontWeight="SemiBold" ToolTip="双击悬浮条立即刷新"/>
-                <TextBlock x:Name="UpdatedText" Text="--:--" Visibility="Collapsed"/>
+                <TextBlock x:Name="UpdatedText" Text="--:--" Foreground="#8E8E93"
+                           FontFamily="Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"
+                           FontSize="8.5" FontWeight="Medium" TextAlignment="Center"
+                           HorizontalAlignment="Center" Margin="0,-1,0,0"/>
             </StackPanel>
         </Grid>
     </Grid>

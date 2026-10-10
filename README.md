@@ -82,7 +82,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-CodexUsageH
 - 立即刷新：双击悬浮条，或在托盘菜单选择“立即刷新”。
 - 鼠标穿透：在托盘菜单勾选“鼠标穿透”；从托盘菜单取消勾选即可恢复。
 - 隐藏/显示：使用托盘菜单切换，或双击托盘图标恢复显示。
-- 自动刷新：每 5 分钟一次。
+- 自动刷新：每 2 分钟一次。
 - 运行日志：`%LOCALAPPDATA%\CodexUsageHUD\CodexUsageHUD.log`。日志记录启动、刷新、窗口关闭和异常信息，并会过滤常见凭据字段；排查突然退出时可提供该文件。若该目录不可写，会退回 `%TEMP%\CodexUsageHUD\CodexUsageHUD.log`。
 
 出现突然退出时，先重新启动并复现一次，再提供日志末尾内容：有 `Window closed` 或 `Fatal startup/UI exception` 表示应用记录到了关闭/异常；如果日志停在刷新中且没有关闭记录，通常表示进程被系统或其他程序终止。
