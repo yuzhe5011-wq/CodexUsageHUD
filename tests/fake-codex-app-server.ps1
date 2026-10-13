@@ -1,5 +1,14 @@
 $ErrorActionPreference = 'Stop'
 
+if ($args -contains '--version') {
+    Write-Output 'codex fake 1.0'
+    exit 0
+}
+if (($args -contains 'app-server') -and ($args -contains '--help')) {
+    Write-Output 'codex fake app-server help'
+    exit 0
+}
+
 while ($null -ne ($line = [Console]::In.ReadLine())) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
     $message = $line | ConvertFrom-Json

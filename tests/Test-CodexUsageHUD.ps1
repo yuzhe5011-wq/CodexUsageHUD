@@ -3,9 +3,10 @@
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $projectRoot 'CodexUsageHUD.ps1'
 $installerPath = Join-Path $projectRoot 'Install-CodexUsageHUD.ps1'
+$releaseScriptPath = Join-Path $projectRoot 'build-windows-release.ps1'
 $fakeServer = Join-Path $PSScriptRoot 'fake-codex-app-server.cmd'
 
-foreach ($path in @($scriptPath, $installerPath)) {
+foreach ($path in @($scriptPath, $installerPath, $releaseScriptPath)) {
     $tokens = $null
     $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -44,6 +45,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installer SelfTest failed with exit code $LASTEXITCODE"
 }
 
+$releaseArchive = Join-Path $projectRoot 'build\CodexUsageHUD-Windows-test.zip'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $releaseScriptPath -Version test
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $releaseArchive -PathType Leaf)) {
+    throw 'Windows release package build failed.'
+}
+Remove-Item -LiteralPath $releaseArchive -Force
+Remove-Item -LiteralPath (Join-Path $projectRoot 'build\CodexUsageHUD-Windows') -Recurse -Force
+
 & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File $scriptPath -Demo -SmokeTest
 if ($LASTEXITCODE -ne 0) {
     throw "SmokeTest failed with exit code $LASTEXITCODE"
@@ -75,6 +84,9 @@ foreach ($required in @(
     'Applications/ChatGPT.app', '--version', 'app-server', '--help',
     '未找到 ChatGPT macOS 客户端，请先安装并登录 ChatGPT。',
     '无法连接 Codex，请确认 ChatGPT macOS 客户端已经登录。',
+    'private let refreshInterval: TimeInterval = 120',
+    'hasUsableUsage', 'Codex app-server 返回了空的用量数据。',
+    '当前 Codex 未返回到期时间',
     'private let delegate = AppDelegate()'
 )) {
     if ($macContent -notmatch [regex]::Escape($required)) {
@@ -94,5 +106,23 @@ foreach ($removed in @('Install-CodexUsageHUD.command', 'Uninstall-CodexUsageHUD
     }
 }
 Write-Output 'PASS: macOS package static validation'
+
+foreach ($requiredPath in @(
+    (Join-Path $projectRoot 'LICENSE'),
+    (Join-Path $projectRoot 'SECURITY.md'),
+    (Join-Path $projectRoot 'CONTRIBUTING.md'),
+    (Join-Path $projectRoot 'CHANGELOG.md'),
+    (Join-Path $projectRoot '.github\workflows\ci.yml'),
+    (Join-Path $projectRoot '.github\workflows\release.yml'),
+    (Join-Path $projectRoot '.github\ISSUE_TEMPLATE\bug_report.yml')
+)) {
+    if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+        throw "Missing repository support file: $requiredPath"
+    }
+}
+if (Test-Path -LiteralPath (Join-Path $projectRoot 'dist\README_20260713180501.md')) {
+    throw 'Stale timestamped distribution README is still present.'
+}
+Write-Output 'PASS: public repository support files'
 
 Write-Output 'PASS: all project checks'

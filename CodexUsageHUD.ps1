@@ -329,10 +329,29 @@ function Get-DemoData {
     return Convert-AppServerResponse -Response $response
 }
 
+function Test-CodexCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$CommandPath
+    )
+
+    if (-not (Test-Path -LiteralPath $CommandPath -PathType Leaf)) { return $false }
+    try {
+        & $CommandPath '--version' *> $null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        & $CommandPath 'app-server' '--help' *> $null
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    }
+}
+
 function Resolve-CodexCommand {
     if (-not [string]::IsNullOrWhiteSpace($env:CODEX_USAGE_HUD_CODEX)) {
         if (-not (Test-Path -LiteralPath $env:CODEX_USAGE_HUD_CODEX -PathType Leaf)) {
             throw "CODEX_USAGE_HUD_CODEX 指向的文件不存在：$env:CODEX_USAGE_HUD_CODEX"
+        }
+        if (-not (Test-CodexCommand -CommandPath $env:CODEX_USAGE_HUD_CODEX)) {
+            throw 'CODEX_USAGE_HUD_CODEX 未通过 codex --version 和 codex app-server --help 验证。'
         }
         return (Resolve-Path -LiteralPath $env:CODEX_USAGE_HUD_CODEX).Path
     }
@@ -341,7 +360,7 @@ function Resolve-CodexCommand {
     if (Test-Path -LiteralPath $configuredPathFile -PathType Leaf) {
         $configuredPath = ([IO.File]::ReadAllText($configuredPathFile)).Trim()
         if (-not [string]::IsNullOrWhiteSpace($configuredPath) -and
-            (Test-Path -LiteralPath $configuredPath -PathType Leaf)) {
+            (Test-CodexCommand -CommandPath $configuredPath)) {
             return (Resolve-Path -LiteralPath $configuredPath).Path
         }
     }
@@ -351,15 +370,18 @@ function Resolve-CodexCommand {
     } else {
         Join-Path $env:APPDATA 'npm\codex.cmd'
     }
-    if ($null -ne $npmCommand -and (Test-Path -LiteralPath $npmCommand -PathType Leaf)) {
+    if ($null -ne $npmCommand -and (Test-CodexCommand -CommandPath $npmCommand)) {
         return $npmCommand
     }
 
-    $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -eq $command -or [string]::IsNullOrWhiteSpace($command.Path)) {
-        throw '未找到 Codex CLI。请安装官方 Codex CLI，并确保 codex 命令位于 PATH。'
+    foreach ($command in @(Get-Command codex -All -ErrorAction SilentlyContinue)) {
+        $commandPath = if (-not [string]::IsNullOrWhiteSpace($command.Path)) { $command.Path } else { $command.Source }
+        if (-not [string]::IsNullOrWhiteSpace($commandPath) -and (Test-CodexCommand -CommandPath $commandPath)) {
+            return $commandPath
+        }
     }
-    return $command.Path
+
+    throw '未找到通过验证的 Codex CLI。请安装官方 Codex CLI，并确保 codex 命令位于 PATH。'
 }
 
 function Start-CodexAppServer {

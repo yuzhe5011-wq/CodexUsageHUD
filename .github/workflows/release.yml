@@ -1,0 +1,52 @@
+name: Build release packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Build Windows ZIP
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-windows-release.ps1 -Version $env:GITHUB_REF_NAME
+      - name: Create Windows checksum
+        shell: powershell
+        run: |
+          $archive = Get-ChildItem -LiteralPath .\build -Filter 'CodexUsageHUD-Windows-*.zip' | Select-Object -First 1
+          $hash = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath "$($archive.FullName).sha256" -Value "$hash  $($archive.Name)" -Encoding ASCII
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexUsageHUD-Windows-${{ github.ref_name }}
+          path: |
+            build/CodexUsageHUD-Windows-*.zip
+            build/CodexUsageHUD-Windows-*.sha256
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Build macOS app
+        run: bash ./macos/build-macos.sh
+      - name: Package macOS app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            ./macos/build/CodexUsageHUD.app \
+            "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip"
+          shasum -a 256 "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip" \
+            > "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip.sha256"
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexUsageHUD-macOS-${{ github.ref_name }}
+          path: ${{ runner.temp }}/CodexUsageHUD-macOS-*.zip

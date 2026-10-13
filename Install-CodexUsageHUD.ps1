@@ -8,7 +8,8 @@ $script:InstallRoot = Join-Path $env:LOCALAPPDATA 'CodexUsageHUD'
 $script:PayloadFiles = @(
     'CodexUsageHUD.ps1',
     'Start-CodexUsageHUD.cmd',
-    'README.md'
+    'README.md',
+    'LICENSE'
 )
 
 Add-Type -AssemblyName PresentationFramework

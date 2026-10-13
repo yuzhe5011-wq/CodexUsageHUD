@@ -26,5 +26,11 @@ xcrun swiftc \
     -o "$APP/Contents/MacOS/CodexUsageHUD"
 cp "$PLIST" "$APP/Contents/Info.plist"
 
+if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    codesign --force --deep --options runtime --timestamp \
+        --sign "$CODESIGN_IDENTITY" "$APP"
+    codesign --verify --deep --strict "$APP"
+fi
+
 "$APP/Contents/MacOS/CodexUsageHUD" --self-test
 echo "构建完成：$APP"

@@ -21,8 +21,10 @@ macOS 12 及以上版本的原生菜单栏与悬浮胶囊版本。它通过 Chat
 
 - 收起时只显示 5 小时和每周剩余百分比；没有 5 小时窗口时显示 `--%`。
 - 鼠标移入后展开详细信息，移出后恢复胶囊。
-- 每 5 分钟自动刷新；双击胶囊或通过菜单栏可立即刷新。
+- 每 2 分钟自动刷新；双击胶囊或通过菜单栏可立即刷新。
 - 拖动、展开、收起和重新显示后，均以收起胶囊为锚点限制在当前显示器可见区域。
+
+如果 app-server 返回完全空的用量结果，程序按刷新失败处理并保留上一次成功数据。账户没有重置卡时显示“— / 没有可用卡”；服务未返回重置卡字段时显示“不可用”。
 
 ## 开发者构建
 
@@ -45,6 +47,14 @@ macos/build/CodexUsageHUD.app
 ditto -c -k --sequesterRsrc --keepParent \
   ./build/CodexUsageHUD.app \
   ./CodexUsageHUD-macOS.zip
+```
+
+构建脚本生成的是未签名 App。面向其他用户发布前，维护者应使用 Apple Developer 证书完成签名，并使用 `notarytool` 公证，否则 macOS Gatekeeper 可能要求用户手动允许首次打开。
+
+如果本机已配置签名身份，可在构建时传入 `CODESIGN_IDENTITY`：
+
+```bash
+CODESIGN_IDENTITY="Developer ID Application: Example" bash ./build-macos.sh
 ```
 
 发布前至少验证：

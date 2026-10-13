@@ -2,7 +2,7 @@ import AppKit
 import Darwin
 import Foundation
 
-private let refreshInterval: TimeInterval = 300
+private let refreshInterval: TimeInterval = 120
 private let rpcTimeout: TimeInterval = 12
 
 private struct UsageWindow {
@@ -151,6 +151,12 @@ private func parseUsage(_ response: [String: Any]) -> UsageData {
     )
 }
 
+private func hasUsableUsage(_ data: UsageData) -> Bool {
+    return data.fiveHour.remaining != nil || data.fiveHour.resetAt != nil ||
+        data.weekly.remaining != nil || data.weekly.resetAt != nil ||
+        data.availableCredits != nil || data.nextCreditExpiry != nil
+}
+
 private final class AppServerClient {
     private let condition = NSCondition()
     private var responses: [Int: [String: Any]] = [:]
@@ -205,7 +211,11 @@ private final class AppServerClient {
         guard let result = message["result"] as? [String: Any] else {
             throw HUDError.message("Codex app-server 返回了没有 result 的响应。")
         }
-        return parseUsage(result)
+        let data = parseUsage(result)
+        guard hasUsableUsage(data) else {
+            throw HUDError.message("Codex app-server 返回了空的用量数据。")
+        }
+        return data
     }
 
     private func resolveCodexCommand() throws -> URL {
@@ -383,13 +393,29 @@ private final class HUDView: NSView {
         drawMeter(title: "每周额度", window: usage?.weekly, x: 214, width: 104)
         separator(x: 330)
         drawText("可用重置卡", rect: NSRect(x: 342, y: 16, width: 82, height: 15), size: 11, weight: .semibold, color: .secondaryLabelColor)
-        let credits = usage?.availableCredits.map(String.init) ?? "--"
+        let creditCount = usage?.availableCredits
+        let credits = creditCount.map(String.init) ?? "--"
         drawText("\(credits) 张", rect: NSRect(x: 342, y: 32, width: 82, height: 26), size: 19, weight: .semibold)
         separator(x: 430)
         drawText("最近到期", rect: NSRect(x: 442, y: 14, width: 105, height: 15), size: 11, weight: .semibold, color: .secondaryLabelColor)
-        let expiry = usage?.nextCreditExpiry.map { Self.shortDate.string(from: $0) } ?? "--"
+        let expiry: String
+        let expiryDetail: String
+        if let creditCount {
+            if creditCount > 0, let nextCreditExpiry = usage?.nextCreditExpiry {
+                expiry = Self.shortDate.string(from: nextCreditExpiry)
+                expiryDetail = countdown(nextCreditExpiry)
+            } else if creditCount > 0 {
+                expiry = "未提供"
+                expiryDetail = "当前 Codex 未返回到期时间"
+            } else {
+                expiry = "—"
+                expiryDetail = "没有可用卡"
+            }
+        } else {
+            expiry = "不可用"
+            expiryDetail = "当前 Codex 未返回重置卡数据"
+        }
         drawText(expiry, rect: NSRect(x: 442, y: 30, width: 105, height: 20), size: 15, weight: .semibold)
-        let expiryDetail = usage?.nextCreditExpiry.map { countdown($0) } ?? "没有可用卡"
         drawText(expiryDetail, rect: NSRect(x: 442, y: 50, width: 105, height: 14), size: 10, weight: .medium, color: .secondaryLabelColor)
         drawText("↻", rect: NSRect(x: 550, y: 21, width: 24, height: 24), size: 17, color: .secondaryLabelColor, alignment: .center)
         let updated = usage.map { Self.time.string(from: $0.updatedAt) } ?? "--:--"

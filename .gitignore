@@ -1,2 +1,15 @@
 *.log
 *.zip
+
+# Build and packaging output
+build/
+macos/build/
+
+# Local installer/runtime configuration
+codex-path.txt
+
+# Operating-system and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
