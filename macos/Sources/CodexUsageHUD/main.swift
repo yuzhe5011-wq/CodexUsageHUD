@@ -372,14 +372,24 @@ private final class HUDView: NSView {
     }
 
     private func drawCompact() {
-        let first = usage?.fiveHour.remaining.map { "\($0)%" } ?? "--%"
-        let second = usage?.weekly.remaining.map { "\($0)%" } ?? "--%"
+        let fiveHourRemaining = usage?.fiveHour.remaining
+        let weeklyRemaining = usage?.weekly.remaining
+        let first = fiveHourRemaining.map { "\($0)%" } ?? "--%"
+        let second = weeklyRemaining.map { "\($0)%" } ?? "--%"
         drawText(first, rect: NSRect(x: 0, y: 11, width: 76, height: 25), size: 17, weight: .semibold,
-                 color: meterColor(usage?.fiveHour.remaining), alignment: .center)
+                 color: meterColor(fiveHourRemaining), alignment: .center)
         NSColor.separatorColor.withAlphaComponent(0.35).setFill()
         fillRect(NSRect(x: 76.5, y: 11, width: 1, height: 24))
         drawText(second, rect: NSRect(x: 78, y: 11, width: 76, height: 25), size: 17, weight: .semibold,
-                 color: meterColor(usage?.weekly.remaining), alignment: .center)
+                 color: meterColor(weeklyRemaining), alignment: .center)
+        drawCompactBar(remaining: fiveHourRemaining, x: 12)
+        drawCompactBar(remaining: weeklyRemaining, x: 90)
+    }
+
+    private func drawCompactBar(remaining: Int?, x: CGFloat) {
+        guard let remaining else { return }
+        meterColor(remaining).withAlphaComponent(0.85).setFill()
+        fillRect(NSRect(x: x, y: 38, width: 52 * CGFloat(remaining) / 100, height: 2))
     }
 
     private func drawDetails() {
