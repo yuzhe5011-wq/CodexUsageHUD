@@ -7,6 +7,16 @@
 - 可用重置卡数量
 - Codex 提供时，显示最近一张可用重置卡的到期时间
 
+## Windows 展示效果
+
+紧凑模式显示两项额度的剩余百分比：
+
+![Windows 紧凑模式](docs/images/windows-compact.png)
+
+完整模式显示额度、重置倒计时和重置卡信息：
+
+![Windows 完整模式](docs/images/windows-expanded.png)
+
 ## 2.0 的数据来源
 
 HUD 启动本机官方 `codex app-server`，通过其 JSONL 协议调用 `account/rateLimits/read`。工具不再读取 `%USERPROFILE%\.codex\auth.json`，不会接触或保存 access token，也不会直接调用 ChatGPT 内部 Web 接口。
