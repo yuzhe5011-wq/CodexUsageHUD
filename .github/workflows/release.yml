@@ -4,12 +4,24 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub Release tag to update, such as v2.0.0
+        required: true
+        type: string
+      source_ref:
+        description: Branch or commit used to build the macOS app
+        required: true
+        default: main
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   windows:
+    if: github.event_name == 'push'
     runs-on: windows-latest
     steps:
       - name: Check out source
@@ -33,27 +45,91 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || github.ref_name }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source_ref || github.ref }}
+      - name: Import Developer ID signing certificate
+        shell: bash
+        env:
+          APPLE_DEVELOPER_ID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12_BASE64 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_DEVELOPER_ID_P12_BASE64:?Add APPLE_DEVELOPER_ID_P12_BASE64 to repository Actions secrets}"
+          : "${APPLE_DEVELOPER_ID_P12_PASSWORD:?Add APPLE_DEVELOPER_ID_P12_PASSWORD to repository Actions secrets}"
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/codexusagehud-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          printf '%s' "$APPLE_DEVELOPER_ID_P12_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | sed -n 's/.*\("Developer ID Application: [^"]*"\).*/\1/p' \
+            | head -n 1 | tr -d '"')"
+          if [[ -z "$IDENTITY" ]]; then
+            echo "No valid Developer ID Application identity was imported." >&2
+            exit 1
+          fi
+          echo "CODESIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
       - name: Build macOS app
         run: bash ./macos/build-macos.sh
-      - name: Package macOS app
+      - name: Notarize and staple macOS app
+        shell: bash
+        env:
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_NOTARY_KEY_P8_BASE64:?Add APPLE_NOTARY_KEY_P8_BASE64 to repository Actions secrets}"
+          : "${APPLE_NOTARY_KEY_ID:?Add APPLE_NOTARY_KEY_ID to repository Actions secrets}"
+          : "${APPLE_NOTARY_ISSUER_ID:?Add APPLE_NOTARY_ISSUER_ID to repository Actions secrets}"
+
+          APP="./macos/build/CodexUsageHUD.app"
+          NOTARY_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          NOTARY_SUBMISSION="$RUNNER_TEMP/CodexUsageHUD-notarization.zip"
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 --decode > "$NOTARY_KEY_PATH"
+
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$NOTARY_SUBMISSION"
+          xcrun notarytool submit "$NOTARY_SUBMISSION" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          codesign --verify --deep --strict "$APP"
+          spctl --assess --type execute --verbose=2 "$APP"
+      - name: Package notarized macOS app
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
             ./macos/build/CodexUsageHUD.app \
-            "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip"
-          shasum -a 256 "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip" \
-            > "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip.sha256"
+            "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_TAG}.zip"
+          shasum -a 256 "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_TAG}.zip" \
+            > "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_TAG}.zip.sha256"
       - name: Upload macOS package
         uses: actions/upload-artifact@v4
         with:
-          name: CodexUsageHUD-macOS-${{ github.ref_name }}
+          name: CodexUsageHUD-macOS-${{ github.event.inputs.release_tag || github.ref_name }}
           path: |
             ${{ runner.temp }}/CodexUsageHUD-macOS-*.zip
             ${{ runner.temp }}/CodexUsageHUD-macOS-*.zip.sha256
 
   release:
+    if: github.event_name == 'push'
     needs: [windows, macos]
     runs-on: ubuntu-latest
     permissions:
@@ -72,3 +148,24 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "CodexUsageHUD $GITHUB_REF_NAME" \
             --generate-notes
+
+  update-existing-release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download notarized macOS package
+        uses: actions/download-artifact@v4
+        with:
+          name: CodexUsageHUD-macOS-${{ github.event.inputs.release_tag }}
+          path: release-assets
+      - name: Replace macOS assets on existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
