@@ -51,16 +51,6 @@ ditto -c -k --sequesterRsrc --keepParent \
 
 构建脚本生成的是未签名 App。面向其他用户发布前，维护者应使用 Apple Developer 证书完成签名，并使用 `notarytool` 公证，否则 macOS Gatekeeper 可能要求用户手动允许首次打开。
 
-GitHub Release 使用的 macOS 包必须经过 Developer ID Application 签名和 Apple 公证。仓库 Actions 需要配置以下 Secrets：
-
-- `APPLE_DEVELOPER_ID_P12_BASE64`：Developer ID Application 证书的 Base64 编码 `.p12` 文件。
-- `APPLE_DEVELOPER_ID_P12_PASSWORD`：该 `.p12` 证书的密码。
-- `APPLE_NOTARY_KEY_P8_BASE64`：App Store Connect API 私钥 `.p8` 文件的 Base64 编码。
-- `APPLE_NOTARY_KEY_ID`：App Store Connect API Key ID。
-- `APPLE_NOTARY_ISSUER_ID`：App Store Connect Issuer ID。
-
-更新现有 Release 时，在 GitHub Actions 中运行 `Build release packages`，填写目标标签（例如 `v2.0.0`）和构建分支（例如 `main`）。该流程会签名、公证并验证 App，然后只替换该 Release 的 macOS ZIP 与校验文件。
-
 如果本机已配置签名身份，可在构建时传入 `CODESIGN_IDENTITY`：
 
 ```bash
