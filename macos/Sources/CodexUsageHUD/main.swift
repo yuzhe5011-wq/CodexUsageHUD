@@ -230,7 +230,9 @@ private final class AppServerClient {
         }
         candidates += [
             systemChatGPT.appendingPathComponent("Contents/Resources/codex").path,
-            userChatGPT.appendingPathComponent("Contents/Resources/codex").path
+            systemChatGPT.appendingPathComponent("Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex").path,
+            userChatGPT.appendingPathComponent("Contents/Resources/codex").path,
+            userChatGPT.appendingPathComponent("Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex").path
         ]
         for directory in (environment["PATH"] ?? "").split(separator: ":") {
             candidates.append("\(directory)/codex")

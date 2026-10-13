@@ -60,7 +60,7 @@ CODESIGN_IDENTITY="Developer ID Application: Example" bash ./build-macos.sh
 发布前至少验证：
 
 - App 能在 `/Applications` 中直接打开。
-- 能找到 `/Applications/ChatGPT.app/Contents/Resources/codex`。
+- 能找到 ChatGPT 内置的 `codex` 命令（兼容 `Contents/Resources/codex` 与 `Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex` 两种布局）。
 - ChatGPT 已登录时能读取用量。
 - 未安装 ChatGPT 和未登录时分别显示正确提示。
 - 胶囊悬停、拖动、多显示器边界和菜单栏操作正常。
