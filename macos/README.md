@@ -65,4 +65,4 @@ CODESIGN_IDENTITY="Developer ID Application: Example" bash ./build-macos.sh
 - 未安装 ChatGPT 和未登录时分别显示正确提示。
 - 胶囊悬停、拖动、多显示器边界和菜单栏操作正常。
 
-代码尚未在 macOS 上编译和验证，需要在 Mac 上完成最终构建测试。
+`build-macos.sh` 会生成支持 Apple Silicon 和 Intel Mac 的通用 App，并将最低系统版本设为 macOS 12。仓库维护者已在 Apple Silicon Mac 上完成构建、用量读取连接测试和界面启动验证。Intel Mac 与 macOS 12 的实际运行仍需在对应设备上验证。

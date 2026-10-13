@@ -6,6 +6,8 @@ SOURCE="$ROOT/Sources/CodexUsageHUD/main.swift"
 PLIST="$ROOT/App/Info.plist"
 BUILD="$ROOT/build"
 APP="$BUILD/CodexUsageHUD.app"
+ARM64_BINARY="$BUILD/CodexUsageHUD-arm64"
+X86_64_BINARY="$BUILD/CodexUsageHUD-x86_64"
 
 if ! xcrun --find swiftc >/dev/null 2>&1; then
     echo "未找到 Swift 编译器。请先运行 xcode-select --install，安装完成后重试。" >&2
@@ -20,10 +22,19 @@ esac
 rm -rf "$BUILD"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 xcrun swiftc \
+    -target arm64-apple-macosx12.0 \
     -O -whole-module-optimization \
     -framework AppKit -framework Foundation \
     "$SOURCE" \
-    -o "$APP/Contents/MacOS/CodexUsageHUD"
+    -o "$ARM64_BINARY"
+xcrun swiftc \
+    -target x86_64-apple-macosx12.0 \
+    -O -whole-module-optimization \
+    -framework AppKit -framework Foundation \
+    "$SOURCE" \
+    -o "$X86_64_BINARY"
+xcrun lipo -create "$ARM64_BINARY" "$X86_64_BINARY" \
+    -output "$APP/Contents/MacOS/CodexUsageHUD"
 cp "$PLIST" "$APP/Contents/Info.plist"
 
 if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
