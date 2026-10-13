@@ -20,7 +20,7 @@ OpenAI 官方 app-server 文档：<https://github.com/openai/codex/blob/main/cod
 - Windows：解压后运行 `Install-CodexUsageHUD.cmd`，安装程序会检测或按确认下载官方 Codex CLI。
 - macOS：下载已经在 Mac 上构建的 `CodexUsageHUD.app.zip`，解压后将 App 拖入“应用程序”。
 
-仓库中的 GitHub Actions 会在推送 `v*` 标签时构建 Windows 和 macOS 包。macOS 包默认未签名/公证，正式面向公众发布前应由维护者完成 Apple Developer 签名和公证。
+仓库中的 GitHub Actions 会在推送 `v*` 标签时构建 Windows 和 macOS 包，并自动创建 GitHub Release。macOS 包默认未签名/公证，正式面向公众发布前应由维护者完成 Apple Developer 签名和公证。
 
 ## 要求
 

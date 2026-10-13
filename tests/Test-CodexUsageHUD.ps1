@@ -123,6 +123,18 @@ foreach ($requiredPath in @(
 if (Test-Path -LiteralPath (Join-Path $projectRoot 'dist\README_20260713180501.md')) {
     throw 'Stale timestamped distribution README is still present.'
 }
+$releaseWorkflow = [IO.File]::ReadAllText((Join-Path $projectRoot '.github\workflows\release.yml'))
+foreach ($requiredReleaseBehavior in @(
+    'actions/download-artifact@v4',
+    'merge-multiple: true',
+    'contents: write',
+    'gh release create',
+    'CodexUsageHUD-macOS-*.zip.sha256'
+)) {
+    if ($releaseWorkflow -notmatch [regex]::Escape($requiredReleaseBehavior)) {
+        throw "Release workflow is missing required behavior: $requiredReleaseBehavior"
+    }
+}
 Write-Output 'PASS: public repository support files'
 
 Write-Output 'PASS: all project checks'
