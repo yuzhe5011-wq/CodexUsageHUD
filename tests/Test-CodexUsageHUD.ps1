@@ -53,6 +53,27 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $releaseArchive -PathTy
 Remove-Item -LiteralPath $releaseArchive -Force
 Remove-Item -LiteralPath (Join-Path $projectRoot 'build\CodexUsageHUD-Windows') -Recurse -Force
 
+# A second copy must exit before creating a WPF window, including from another path.
+$instanceMutex = New-Object System.Threading.Mutex($false, 'Local\CodexUsageHUD.SingleInstance')
+$ownsInstanceMutex = $false
+$duplicateScript = Join-Path ([IO.Path]::GetTempPath()) ('CodexUsageHUD-' + [guid]::NewGuid() + '.ps1')
+try {
+    $ownsInstanceMutex = $instanceMutex.WaitOne(0)
+    if (-not $ownsInstanceMutex) { throw 'Close the running HUD before running the UI tests.' }
+    Copy-Item -LiteralPath $scriptPath -Destination $duplicateScript
+    $output = & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File $duplicateScript -Demo -SmokeTest
+    if ($LASTEXITCODE -ne 0 -or $output -notcontains 'Codex Usage HUD is already running.' -or
+        $output -contains 'PASS: WPF window loaded and rendered') {
+        throw 'Duplicate HUD instance was not suppressed.'
+    }
+    Write-Output 'PASS: duplicate instance from another path exits before WPF startup'
+} finally {
+    if ($ownsInstanceMutex) { $instanceMutex.ReleaseMutex() }
+    $instanceMutex.Dispose()
+    Remove-Item -LiteralPath $duplicateScript -Force -ErrorAction SilentlyContinue
+}
+
+# After releasing the lock, the HUD must start and render normally.
 & powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File $scriptPath -Demo -SmokeTest
 if ($LASTEXITCODE -ne 0) {
     throw "SmokeTest failed with exit code $LASTEXITCODE"

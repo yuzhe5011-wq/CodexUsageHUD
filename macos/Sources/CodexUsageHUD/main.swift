@@ -5,6 +5,25 @@ import Foundation
 private let refreshInterval: TimeInterval = 120
 private let rpcTimeout: TimeInterval = 12
 
+// Keep the file in place: unlinking it would allow another process to lock a new inode.
+private final class InstanceLock {
+    private let descriptor: Int32
+
+    init?(url: URL) throws {
+        let fd = open(url.path, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard fd >= 0 else { throw HUDError.message("无法打开单实例锁。") }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else {
+            let code = errno
+            close(fd)
+            if code == EWOULDBLOCK { return nil }
+            throw HUDError.message("无法获取单实例锁。")
+        }
+        descriptor = fd
+    }
+
+    deinit { close(descriptor) }
+}
+
 private struct UsageWindow {
     let remaining: Int?
     let resetAt: Date?
@@ -715,6 +734,19 @@ private func runSelfTest() -> Int32 {
         fputs("FAIL: parser self-test\n", stderr)
         return 1
     }
+    do {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var first = try InstanceLock(url: url)
+        guard first != nil, try InstanceLock(url: url) == nil else { return 1 }
+        first = nil
+        guard let reacquired = try InstanceLock(url: url) else { return 1 }
+        withExtendedLifetime(reacquired) {}
+        print("PASS: single-instance lock and release")
+    } catch {
+        fputs("FAIL: single-instance lock: \(error)\n", stderr)
+        return 1
+    }
     print("PASS: parser self-test")
     return 0
 }
@@ -735,8 +767,25 @@ if CommandLine.arguments.contains("--connection-test") {
     }
 }
 
+// Application Support is shared by all copies of this app for the current user.
+private let instanceLock: InstanceLock
+do {
+    let directory = try FileManager.default.url(for: .applicationSupportDirectory,
+        in: .userDomainMask, appropriateFor: nil, create: true)
+        .appendingPathComponent("CodexUsageHUD", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    guard let lock = try InstanceLock(url: directory.appendingPathComponent("instance.lock")) else {
+        print("Codex Usage HUD is already running.")
+        exit(0)
+    }
+    instanceLock = lock
+} catch {
+    fputs("Codex Usage HUD: \(error.localizedDescription)\n", stderr)
+    exit(1)
+}
+
 let application = NSApplication.shared
 private let delegate = AppDelegate()
 application.delegate = delegate
 application.setActivationPolicy(.accessory)
-application.run()
+withExtendedLifetime(instanceLock) { application.run() }

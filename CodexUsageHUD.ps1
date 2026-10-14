@@ -565,7 +565,21 @@ if ($ConnectionTest) {
     exit 0
 }
 
+# A fixed per-session name also covers copies launched from other directories.
+$instanceMutex = $null
+$ownsInstanceMutex = $false
 try {
+    $instanceMutex = New-Object System.Threading.Mutex($false, 'Local\CodexUsageHUD.SingleInstance')
+    try {
+        $ownsInstanceMutex = $instanceMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        $ownsInstanceMutex = $true
+    }
+    if (-not $ownsInstanceMutex) {
+        Write-Output 'Codex Usage HUD is already running.'
+        return
+    }
+
     Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
@@ -1219,4 +1233,7 @@ public static class HudNativeMethods {
         [System.Windows.MessageBoxImage]::Error
     )
     exit 1
+} finally {
+    if ($ownsInstanceMutex) { $instanceMutex.ReleaseMutex() }
+    if ($null -ne $instanceMutex) { $instanceMutex.Dispose() }
 }

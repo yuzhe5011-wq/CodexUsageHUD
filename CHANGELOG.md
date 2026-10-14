@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prevented duplicate Windows and macOS HUD instances across launch directories; locks release on exit or process termination.
+
 - Added public-repository license, security guidance, contribution notes, and issue templates.
 - Added Windows release packaging and GitHub Actions validation/build workflows.
 - Synchronized macOS refresh and empty-response behavior with Windows.
