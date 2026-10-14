@@ -473,7 +473,7 @@ function Get-LiveData {
         Send-AppServerMessage -Process $process -Message @{
             id = 1
             method = 'initialize'
-            params = @{ clientInfo = @{ name = 'codex-usage-hud'; version = '2.0.0' } }
+            params = @{ clientInfo = @{ name = 'codex-usage-hud'; version = '2.0.1' } }
         }
         [void](Read-AppServerResponse -Process $process -Id 1)
         Send-AppServerMessage -Process $process -Message @{ method = 'initialized'; params = @{} }

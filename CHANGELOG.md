@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.0.1
 
 - Prevented duplicate Windows and macOS HUD instances across launch directories; locks release on exit or process termination.
-
+- Fixed discovery of the Codex CLI bundled with ChatGPT on macOS.
+- Fixed UTF-8 input handling and macOS line endings in Windows CI.
 - Added public-repository license, security guidance, contribution notes, and issue templates.
 - Added Windows release packaging and GitHub Actions validation/build workflows.
 - Synchronized macOS refresh and empty-response behavior with Windows.

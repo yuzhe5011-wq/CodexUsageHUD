@@ -218,7 +218,7 @@ private final class AppServerClient {
         try send([
             "id": 1,
             "method": "initialize",
-            "params": ["clientInfo": ["name": "codex-usage-hud", "version": "2.0.0"]]
+            "params": ["clientInfo": ["name": "codex-usage-hud", "version": "2.0.1"]]
         ], to: input.fileHandleForWriting)
         _ = try waitForResponse(id: 1)
         try send(["method": "initialized", "params": [:] as [String: Any]], to: input.fileHandleForWriting)

@@ -1,12 +1,21 @@
 name: Build release packages
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (for example v2.0.1)'
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
 
 permissions:
   contents: read
+
+env:
+  RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
   windows:
@@ -16,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Build Windows ZIP
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-windows-release.ps1 -Version $env:GITHUB_REF_NAME
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-windows-release.ps1 -Version $env:RELEASE_VERSION
       - name: Create Windows checksum
         shell: powershell
         run: |
@@ -26,7 +35,7 @@ jobs:
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
-          name: CodexUsageHUD-Windows-${{ github.ref_name }}
+          name: CodexUsageHUD-Windows-${{ env.RELEASE_VERSION }}
           path: |
             build/CodexUsageHUD-Windows-*.zip
             build/CodexUsageHUD-Windows-*.sha256
@@ -42,13 +51,13 @@ jobs:
         run: |
           ditto -c -k --sequesterRsrc --keepParent \
             ./macos/build/CodexUsageHUD.app \
-            "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip"
-          shasum -a 256 "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip" \
-            > "$RUNNER_TEMP/CodexUsageHUD-macOS-${GITHUB_REF_NAME}.zip.sha256"
+            "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_VERSION}.zip"
+          shasum -a 256 "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_VERSION}.zip" \
+            > "$RUNNER_TEMP/CodexUsageHUD-macOS-${RELEASE_VERSION}.zip.sha256"
       - name: Upload macOS package
         uses: actions/upload-artifact@v4
         with:
-          name: CodexUsageHUD-macOS-${{ github.ref_name }}
+          name: CodexUsageHUD-macOS-${{ env.RELEASE_VERSION }}
           path: |
             ${{ runner.temp }}/CodexUsageHUD-macOS-*.zip
             ${{ runner.temp }}/CodexUsageHUD-macOS-*.zip.sha256
@@ -68,7 +77,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release-assets/* \
+          gh release create "$RELEASE_VERSION" release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "CodexUsageHUD $GITHUB_REF_NAME" \
+            --title "CodexUsageHUD $RELEASE_VERSION" \
+            --target "$GITHUB_SHA" \
             --generate-notes
