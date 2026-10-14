@@ -1,0 +1,2 @@
+# Keep macOS sources and scripts usable after a Windows checkout.
+macos/** text eol=lf
