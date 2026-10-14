@@ -1,4 +1,8 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
+
+# Process.StandardInput may emit a UTF-8 preamble on Windows PowerShell 5.1.
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
 if ($args -contains '--version') {
     Write-Output 'codex fake 1.0'
@@ -11,7 +15,7 @@ if (($args -contains 'app-server') -and ($args -contains '--help')) {
 
 while ($null -ne ($line = [Console]::In.ReadLine())) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
-    $message = $line | ConvertFrom-Json
+    $message = $line.TrimStart([char]0xFEFF) | ConvertFrom-Json
 
     if ($message.method -eq 'initialize') {
         [Console]::Out.WriteLine((@{
